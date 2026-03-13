@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minimal Exam Stopwatch</title>
+    <style>
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            transition: background-color 0.3s ease;
+        }
+
+        body.distracted {
+            background-color: #4a0000;
+        }
+
+        #progress-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 6px;
+            background-color: rgba(255, 255, 255, 0.05);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        #progress-bar {
+            height: 100%;
+            width: 0%;
+            background-color: #ffffff;
+            transition: background-color 0.2s ease;
+        }
+
+        #progress-bar.paused {
+            background-color: #ffc107;
+        }
+
+        #instruction {
+            position: absolute;
+            top: 20%;
+            font-size: 1.2rem;
+            color: #888;
+            letter-spacing: 1px;
+            transition: opacity 0.5s ease, color 0.3s ease;
+            text-align: center;
+        }
+
+        /* Setup Container (Bottom) */
+        #setup-container {
+            position: absolute;
+            bottom: 10%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            transition: opacity 0.5s ease;
+            z-index: 20;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 1.5rem 2.5rem;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .setup-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Toggle Switch Styling */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .3s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 16px;
+            width: 16px;
+            left: 4px;
+            bottom: 4px;
+            background-color: #aaa;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #ff5252;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: #fff;
+        }
+
+        .setup-label {
+            color: #888;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* Time inputs */
+        .setup-input {
+            background: #222;
+            border: 1px solid #444;
+            color: #fff;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 1rem;
+            font-family: inherit;
+            outline: none;
+        }
+        
+        .setup-input:focus {
+            border-color: #ff5252;
+        }
+
+        #limit-input {
+            width: 60px;
+            text-align: center;
+        }
+
+        /* Hide the up/down arrows in the number input */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            -webkit-appearance: none; 
+            margin: 0; 
+        }
+        input[type=number] {
+            -moz-appearance: textfield; /* Firefox */
+            appearance: textfield;
+        }
+
+        .timer-container {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 10;
+        }
+
+        #timerA {
+            font-size: 8rem;
+            font-variant-numeric: tabular-nums;
+            font-weight: 300;
+            transition: color 0.3s ease, opacity 0.2s ease;
+        }
+
+        #timerA.red {
+            color: #ff5252;
+        }
+
+        #timerB {
+            font-size: 3rem;
+            font-variant-numeric: tabular-nums;
+            font-weight: 300;
+            opacity: 0.35;
+            margin-top: -1rem;
+        }
+
+        /* Bottom Stats */
+        #stats-container {
+            margin-top: 4rem;
+            font-size: 1.2rem;
+            opacity: 0.5;
+            letter-spacing: 0.5px;
+            display: flex;
+            gap: 2rem;
+            z-index: 10;
+        }
+
+        /* Left Stats Column */
+        #left-stats {
+            position: absolute;
+            left: 3rem;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 2.5rem;
+            opacity: 0.5;
+            text-align: left;
+            z-index: 10;
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: #888;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 0.3rem;
+        }
+
+        .stat-value {
+            font-weight: bold;
+            color: #ffffff;
+        }
+
+        #left-stats .stat-value {
+            font-size: 1.5rem;
+            font-variant-numeric: tabular-nums;
+            font-weight: 300;
+        }
+        
+        #dCount {
+            color: #ff5252;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="progress-container">
+        <div id="progress-bar"></div>
+    </div>
+
+    <div id="instruction">Tap SPACE to start / next question. Hold 1s to pause.</div>
+
+    <div id="setup-container">
+        <div class="setup-row">
+            <span class="setup-label">End Exam After:</span>
+            <input type="number" id="limit-input" class="setup-input" value="60" min="1">
+            <select id="limit-type" class="setup-input">
+                <option value="minutes">Minutes</option>
+                <option value="questions">Questions</option>
+            </select>
+        </div>
+        
+        <div class="setup-row">
+            <label class="toggle-switch">
+                <input type="checkbox" id="distraction-toggle" checked>
+                <span class="slider"></span>
+            </label>
+            <label for="distraction-toggle" class="setup-label">Strict Mode (Track Distractions)</label>
+        </div>
+    </div>
+
+    <div id="left-stats">
+        <div>
+            <div class="stat-label">Average Time</div>
+            <div class="stat-value" id="avgTime">00:00</div>
+        </div>
+        <div>
+            <div class="stat-label">Highest Time</div>
+            <div class="stat-value" id="maxTime">00:00</div>
+        </div>
+        <div>
+            <div class="stat-label">Lowest Time</div>
+            <div class="stat-value" id="minTime">00:00</div>
+        </div>
+    </div>
+
+    <div class="timer-container">
+        <div id="timerA">00:00</div>
+        <div id="timerB">00:00:00</div>
+    </div>
+
+    <div id="stats-container">
+        <div>Questions Done: <span id="qCount" class="stat-value">0</span></div>
+        <div id="distraction-stat-wrap">Distractions: <span id="dCount" class="stat-value">0</span></div>
+    </div>
+
+    <script>
+        let elapsedA = 0; 
+        let elapsedB = 0; 
+        let maxTimeLimitMs = 10800000; 
+        let lastFrameTime = 0;
+        let animationFrameId = null;
+        
+        let questionsDone = 0;
+        let distractions = 0;
+        let questionTimes = []; 
+        let state = 'IDLE'; 
+        
+        let holdStartTime = 0;
+        const HOLD_DURATION = 1000; 
+        
+        let audioCtx = null;
+        let hasBeeped = false;
+        let trackDistractions = true; 
+
+        // Elements
+        const timerA_El = document.getElementById('timerA');
+        const timerB_El = document.getElementById('timerB');
+        const qCount_El = document.getElementById('qCount');
+        const dCount_El = document.getElementById('dCount');
+        const instruction_El = document.getElementById('instruction');
+        const setupContainer = document.getElementById('setup-container');
+        const distractionToggle = document.getElementById('distraction-toggle');
+        const limitInput = document.getElementById('limit-input');
+        const limitType = document.getElementById('limit-type');
+        const distractionStatWrap = document.getElementById('distraction-stat-wrap');
+        const progContainer = document.getElementById('progress-container');
+        const progBar = document.getElementById('progress-bar');
+        
+        const avgTime_El = document.getElementById('avgTime');
+        const maxTime_El = document.getElementById('maxTime');
+        const minTime_El = document.getElementById('minTime');
+
+        const defaultInstructionText = "Tap SPACE to start / next question. Hold 1s to pause.";
+
+        function formatTime(ms, includeHours = false) {
+            const totalSeconds = Math.floor(ms / 1000);
+            const h = Math.floor(totalSeconds / 3600);
+            const m = Math.floor((totalSeconds % 3600) / 60);
+            const s = totalSeconds % 60;
+            
+            const pad = num => num.toString().padStart(2, '0');
+            
+            if (includeHours || h > 0) {
+                return `${pad(h)}:${pad(m)}:${pad(s)}`;
+            } else {
+                const totalMins = Math.floor(totalSeconds / 60);
+                return `${pad(totalMins)}:${pad(s)}`;
+            }
+        }
+
+        function playBeep() {
+            if (!audioCtx) return;
+            const oscillator = audioCtx.createOscillator();
+            const gainNode = audioCtx.createGain();
+            
+            oscillator.type = 'sine';
+            oscillator.frequency.setValueAtTime(600, audioCtx.currentTime); 
+            gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.3);
+            
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+            oscillator.start();
+            oscillator.stop(audioCtx.currentTime + 0.3);
+        }
+
+        function enterFullscreen() {
+            const elem = document.documentElement;
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                if (elem.requestFullscreen) {
+                    elem.requestFullscreen().catch(() => {});
+                } else if (elem.webkitRequestFullscreen) {
+                    elem.webkitRequestFullscreen();
+                }
+            }
+        }
+
+        function exitFullscreen() {
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                if (document.exitFullscreen) {
+                    document.exitFullscreen().catch(() => {});
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+
+        function updateLeftStats() {
+            if (questionTimes.length === 0) return;
+
+            const sum = questionTimes.reduce((a, b) => a + b, 0);
+            const avg = sum / questionTimes.length;
+            const max = Math.max(...questionTimes);
+            const min = Math.min(...questionTimes);
+
+            avgTime_El.innerText = formatTime(avg, false);
+            maxTime_El.innerText = formatTime(max, false);
+            minTime_El.innerText = formatTime(min, false);
+        }
+
+        function tick(now) {
+            if (state === 'IDLE' || state === 'ENDED') return;
+
+            const delta = now - lastFrameTime;
+            lastFrameTime = now;
+
+            if (state === 'RUNNING' || state === 'PAUSING') {
+                elapsedA += delta;
+                elapsedB += delta;
+            }
+
+            if (elapsedB >= maxTimeLimitMs) {
+                const overshoot = elapsedB - maxTimeLimitMs;
+                elapsedB = maxTimeLimitMs;
+                elapsedA -= overshoot; 
+                
+                state = 'ENDED';
+                timerB_El.innerText = formatTime(elapsedB, true);
+                timerA_El.innerText = formatTime(elapsedA, false); 
+                
+                exitFullscreen();
+                
+                if (elapsedA > 0) {
+                    questionTimes.push(elapsedA);
+                    updateLeftStats();
+                }
+                
+                instruction_El.innerText = "Congratulations";
+                instruction_El.style.opacity = '1';
+                instruction_El.style.color = '#ff5252';
+                return; 
+            }
+
+            if (state === 'PAUSING') {
+                const holdTime = now - holdStartTime;
+                let progress = (holdTime / HOLD_DURATION) * 100;
+                progContainer.style.opacity = '1';
+
+                if (progress >= 100) {
+                    progress = 100;
+                    state = 'PAUSED';
+                    timerA_El.style.opacity = '0.5';
+                    progBar.classList.add('paused');
+                    exitFullscreen(); 
+                }
+                progBar.style.width = progress + '%';
+            } else if (state === 'RUNNING') {
+                progContainer.style.opacity = '0';
+                progBar.style.width = '0%';
+                progBar.classList.remove('paused');
+            }
+
+            timerB_El.innerText = formatTime(elapsedB, true);
+            timerA_El.innerText = formatTime(elapsedA, false);
+
+            const secA = Math.floor(elapsedA / 1000);
+            if (secA >= 180) {
+                timerA_El.classList.add('red');
+                if (!hasBeeped) {
+                    playBeep();
+                    hasBeeped = true;
+                }
+            } else {
+                timerA_El.classList.remove('red');
+            }
+
+            animationFrameId = requestAnimationFrame(tick);
+        }
+
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+                    e.preventDefault();
+                }
+                if (e.repeat) return; 
+
+                if (state === 'IDLE') {
+                    trackDistractions = distractionToggle.checked;
+                    let limitVal = Math.max(1, parseInt(limitInput.value) || 60);
+                    
+                    if (limitType.value === 'questions') {
+                        maxTimeLimitMs = limitVal * 3 * 60 * 1000;
+                    } else {
+                        maxTimeLimitMs = limitVal * 60 * 1000;
+                    }
+
+                    setupContainer.style.opacity = '0';
+                    setTimeout(() => setupContainer.style.display = 'none', 500); 
+                    
+                    if (!trackDistractions) {
+                        distractionStatWrap.style.display = 'none'; 
+                    }
+
+                    state = 'RUNNING';
+                    instruction_El.style.opacity = '0';
+                    enterFullscreen();
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                    
+                    lastFrameTime = performance.now();
+                    animationFrameId = requestAnimationFrame(tick);
+                } else if (state === 'RUNNING') {
+                    state = 'PAUSING';
+                    holdStartTime = performance.now();
+                } else if (state === 'PAUSED') {
+                    state = 'RUNNING';
+                    timerA_El.style.opacity = '1';
+                    progBar.classList.remove('paused');
+                    enterFullscreen(); 
+                    lastFrameTime = performance.now(); 
+                }
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT') {
+                    e.preventDefault();
+                }
+                
+                if (state === 'PAUSING') {
+                    questionTimes.push(elapsedA);
+                    updateLeftStats();
+
+                    elapsedA = elapsedB % 1000; 
+                    
+                    hasBeeped = false;
+                    questionsDone++;
+                    qCount_El.innerText = questionsDone;
+                    state = 'RUNNING';
+                }
+            }
+        });
+
+        window.addEventListener('blur', () => {
+            if (trackDistractions && (state === 'RUNNING' || state === 'PAUSING')) {
+                distractions++;
+                dCount_El.innerText = distractions;
+                
+                document.body.classList.add('distracted');
+                instruction_El.innerText = "DISTRACTION DETECTED! FOCUS LOST.";
+                instruction_El.style.opacity = '1';
+                instruction_El.style.color = '#ff5252';
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            if (trackDistractions) {
+                document.body.classList.remove('distracted');
+                instruction_El.style.color = '#888';
+                instruction_El.innerText = defaultInstructionText;
+                
+                if (state === 'RUNNING' || state === 'PAUSING') {
+                    setTimeout(() => {
+                        if (state === 'RUNNING') instruction_El.style.opacity = '0';
+                    }, 1500);
+                }
+            }
+            if (state !== 'IDLE' && state !== 'ENDED') {
+                lastFrameTime = performance.now();
+            }
+        });
+
+        window.addEventListener("beforeunload", (e) => {
+            if (state === 'RUNNING' || state === 'PAUSED' || state === 'PAUSING') {
+                e.preventDefault();
+                e.returnValue = ''; 
+            }
+        });
+
+    </script>
+</body>
+</html>
