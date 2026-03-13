@@ -247,7 +247,7 @@
     <div id="setup-container">
         <div class="setup-row">
             <span class="setup-label">End Exam After:</span>
-            <input type="number" id="limit-input" class="setup-input" value="60" min="1">
+            <input type="number" id="limit-input" class="setup-input" value="180" min="1">
             <select id="limit-type" class="setup-input">
                 <option value="minutes">Minutes</option>
                 <option value="questions">Questions</option>
@@ -471,7 +471,7 @@
 
                 if (state === 'IDLE') {
                     trackDistractions = distractionToggle.checked;
-                    let limitVal = Math.max(1, parseInt(limitInput.value) || 60);
+                    let limitVal = Math.max(1, parseInt(limitInput.value) || 180);
                     
                     if (limitType.value === 'questions') {
                         maxTimeLimitMs = limitVal * 3 * 60 * 1000;
@@ -565,3 +565,4 @@
     </script>
 </body>
 </html>
+
